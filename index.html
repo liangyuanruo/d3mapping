@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+  /* Color Scotland, Wales, NIreland, England, Ireland */
+  .subunit.SCT { fill: steelblue; }
+  .subunit.WLS { fill: lightgreen; }
+  .subunit.NIR { fill: lightgray; }
+  .subunit.ENG { fill: tomato; }
+  .subunit.IRL { fill: white; }
+  
+  /* Interior England-Scotland, England-Wales boundary style */
+  .subunit-boundary {
+    fill: none;
+    stroke: #777;
+    stroke-dasharray: 2,2;
+    stroke-linejoin: round;
+  }
+  
+  /* Ireland boundary style */
+  .subunit-boundary.IRL {
+    stroke: #aaa;
+  }
+  
+  /* Style country label */ 
+  .subunit-label {
+    fill: #777;
+    fill-opacity: .5;
+    font-size: 20px;
+    font-weight: 300;
+    text-anchor: middle;
+  }
+  
+  /* Style place labels */ 
+  .place,
+  .place-label {
+    fill: #111;
+    fill-opacity: .6;
+  }
+
+  text {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10px;
+    pointer-events: none;
+  }
+
+</style>
+<body>
+
+<!-- Import d3.js and topojson -->
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+
+<!-- Javascript code here -->
+<script>
+
+
+  //Create SVG canvas
+  var width = 960,
+      height = 1160;
+  
+  var svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+//Data load callback function
+d3.json("uk.json", function(error, uk) {
+
+  if (error) return console.error(error);
+  console.log(uk);
+
+
+  //Projection and path generator
+
+  //Convert data from topojson to GeoJSON
+  var subunits = topojson.feature(uk, uk.objects.subunits);
+
+
+  //Definition of map projection
+  var projection = d3.geo.albers()
+      .center([0, 55.4])
+      .rotate([4.4, 0])
+      .parallels([50, 60])
+      .scale(6000)
+      .translate([width / 2, height / 2]);
+  
+  //Path generator
+  var path = d3.geo.path()
+      .projection(projection);
+  
+  //Bind the geojson data and set the "d" attr w path gen
+  svg.append("path")
+      .datum(subunits)
+      .attr("d", path);
+
+  //Give each country a class so CSS can colour
+  svg.selectAll(".subunit")
+      .data(topojson.feature(uk, uk.objects.subunits).features)
+    .enter().append("path")
+      .attr("class", function(d) { return "subunit " + d.id; })
+      .attr("d", path);
+  
+  //Draw interior boundaries (England-Scotland & England-Wales)
+  svg.append("path")
+      .datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a !== b && a.id !== "IRL"; }))
+      .attr("d", path)
+      .attr("class", "subunit-boundary");
+
+  //Draw exterior boundary (Ireland)
+   svg.append("path")
+      .datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a === b && a.id === "IRL"; }))
+      .attr("d", path)
+      .attr("class", "subunit-boundary IRL");
+
+  //Draw places as a circle 
+  svg.append("path")
+      .datum(topojson.feature(uk, uk.objects.places))
+      .attr("d", path)
+      .attr("class", "place");
+  
+  //Label places next to circles
+  svg.selectAll(".place-label")
+      .data(topojson.feature(uk, uk.objects.places).features)
+    .enter().append("text")
+      .attr("class", "place-label")
+      .attr("transform", function(d) { return "translate(" + projection(d.geometry.coordinates) + ")"; })
+      .attr("dy", ".35em")
+      .text(function(d) { return d.properties.name; });
+
+  //Text labels on left side/ride side depending on point
+  svg.selectAll(".place-label")
+      .attr("x", function(d) { return d.geometry.coordinates[0] > -1 ? 6 : -6; })
+      .style("text-anchor", function(d) { return d.geometry.coordinates[0] > -1 ? "start" : "end"; });
+  
+  //Label countries
+  svg.selectAll(".subunit-label")
+      .data(topojson.feature(uk, uk.objects.subunits).features)
+    .enter().append("text")
+      .attr("class", function(d) { return "subunit-label " + d.id; })
+      .attr("transform", function(d) { return "translate(" + path.centroid(d) + ")"; })
+      .attr("dy", ".35em")
+      .text(function(d) { return d.properties.name; });
+
+
+
+
+});
+
+</script>
